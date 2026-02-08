@@ -1,0 +1,70 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+from datetime import datetime
+import pytz
+
+# Sample data simulation (replace with actual data source)
+data = {
+    'App_Name': ['App1', 'App2', 'App3', 'App4', 'App5', 'App6', 'App7', 'App8', 'App9', 'App10', 'App11', 'App12', 'App13', 'App14', 'App15'],
+    'Category': ['Games', 'Games', 'Games', 'Social', 'Social', 'Social', 'Productivity', 'Productivity', 'Productivity', 'Entertainment', 'Entertainment', 'Entertainment', 'Tools', 'Tools', 'Tools'],
+    'Type': ['Free', 'Paid', 'Free', 'Free', 'Paid', 'Free', 'Paid', 'Free', 'Paid', 'Free', 'Paid', 'Free', 'Free', 'Paid', 'Free'],
+    'Installs': [500000, 20000, 300000, 400000, 15000, 250000, 10000, 350000, 5000, 450000, 8000, 200000, 300000, 12000, 150000],  # Some below 10k to filter
+    'Revenue': [50000, 5000, 40000, 60000, 5000, 30000, 5000, 70000, 2000, 80000, 3000, 25000, 45000, 4000, 20000],  # Some below 10k to filter
+    'Android_Version': [5.0, 4.1, 5.1, 4.2, 4.0, 5.2, 4.1, 5.0, 4.0, 5.1, 4.0, 5.0, 4.2, 4.1, 5.0],  # Some <=4.0 to filter
+    'Size_MB': [20, 16, 18, 22, 14, 19, 12, 25, 10, 21, 11, 17, 23, 13, 16],  # Some <=15 to filter
+    'Content_Rating': ['Everyone', 'Everyone', 'Everyone', 'Everyone', 'Everyone', 'Everyone', 'Everyone', 'Everyone', 'Everyone', 'Everyone', 'Everyone', 'Everyone', 'Everyone', 'Everyone', 'Everyone']  # All Everyone for simplicity
+}
+
+df = pd.DataFrame(data)
+
+# Filters
+df_filtered = df[
+    (df['Installs'] >= 10000) &
+    (df['Revenue'] >= 10000) &
+    (df['Android_Version'] > 4.0) &
+    (df['Size_MB'] > 15) &
+    (df['Content_Rating'] == 'Everyone') &
+    (df['App_Name'].str.len() <= 30)
+]
+
+# Calculate total installs per category to find top 3
+category_totals = df_filtered.groupby('Category')['Installs'].sum().reset_index()
+top3_categories = category_totals.nlargest(3, 'Installs')['Category'].tolist()
+df_top3 = df_filtered[df_filtered['Category'].isin(top3_categories)]
+
+# Group by Category and Type, calculate averages
+grouped = df_top3.groupby(['Category', 'Type']).agg({'Installs': 'mean', 'Revenue': 'mean'}).reset_index()
+
+# Pivot for plotting
+pivot_installs = grouped.pivot(index='Category', columns='Type', values='Installs')
+pivot_revenue = grouped.pivot(index='Category', columns='Type', values='Revenue')
+
+# Time check for IST (Indian Standard Time, UTC+5:30)
+ist = pytz.timezone('Asia/Kolkata')
+now = datetime.now(ist)
+current_hour = now.hour
+
+if 13 <= current_hour < 14:  # 1PM to 2PM IST
+    # Create dual-axis chart
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+    
+    # Bar chart for average installs
+    pivot_installs.plot(kind='bar', ax=ax1, position=0, width=0.4, color=['skyblue', 'lightcoral'], alpha=0.7)
+    ax1.set_ylabel('Average Installs', color='blue')
+    ax1.tick_params(axis='y', labelcolor='blue')
+    
+    # Second axis for revenue
+    ax2 = ax1.twinx()
+    pivot_revenue.plot(kind='bar', ax=ax2, position=1, width=0.4, color=['green', 'orange'], alpha=0.7)
+    ax2.set_ylabel('Average Revenue ($)', color='red')
+    ax2.tick_params(axis='y', labelcolor='red')
+    
+    ax1.set_xlabel('Category')
+    ax1.set_title('Average Installs and Revenue for Free vs. Paid Apps in Top 3 Categories')
+    ax1.legend(title='Installs', loc='upper left')
+    ax2.legend(title='Revenue', loc='upper right')
+    
+    plt.tight_layout()
+    plt.show()
+else:
+    print("The graph is only available between 1PM IST and 2PM IST. Current time:", now.strftime('%H:%M %Z'))
