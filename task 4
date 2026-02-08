@@ -1,0 +1,70 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+from datetime import datetime
+import pytz
+
+# Sample data simulation (replace with actual data source)
+# Assuming time series data with monthly installs
+dates = pd.date_range(start='2023-01-01', periods=12, freq='M')
+categories = ['Entertainment', 'Communication', 'Business', 'Beauty']  # Filtered to start with E, C, B
+data = []
+for cat in categories:
+    for date in dates:
+        installs = 100000 + (hash(cat + str(date)) % 50000)  # Simulated installs
+        data.append({'Date': date, 'Category': cat, 'Installs': installs, 'Reviews': 600, 'App_Name': 'SampleApp'})  # Reviews >500, app name not starting with x,y,z and not containing S
+
+df = pd.DataFrame(data)
+
+# Filters
+df_filtered = df[
+    (~df['App_Name'].str.startswith(('x', 'y', 'z'))) &
+    (~df['App_Name'].str.contains('S')) &
+    (df['Reviews'] > 500) &
+    (df['Category'].str.startswith(('E', 'C', 'B')))
+]
+
+# Translate categories for display
+translation_dict = {
+    'Beauty': 'सौंदर्य',  # Hindi
+    'Business': 'வணிகம்',  # Tamil
+    'Dating': 'Dating'  # German, but Dating not in filtered categories
+}
+df_filtered['Category_Display'] = df_filtered['Category'].map(lambda x: translation_dict.get(x, x))
+
+# Aggregate total installs per category per month
+df_agg = df_filtered.groupby(['Date', 'Category_Display'])['Installs'].sum().reset_index()
+
+# Calculate month-over-month growth
+df_agg = df_agg.sort_values(['Category_Display', 'Date'])
+df_agg['Prev_Installs'] = df_agg.groupby('Category_Display')['Installs'].shift(1)
+df_agg['Growth'] = (df_agg['Installs'] - df_agg['Prev_Installs']) / df_agg['Prev_Installs'] * 100
+df_agg['Significant_Growth'] = df_agg['Growth'] > 20
+
+# Time check for IST (Indian Standard Time, UTC+5:30)
+ist = pytz.timezone('Asia/Kolkata')
+now = datetime.now(ist)
+current_hour = now.hour
+
+if 18 <= current_hour < 21:  # 6PM to 9PM IST
+    # Create time series line chart
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    for cat in df_agg['Category_Display'].unique():
+        cat_data = df_agg[df_agg['Category_Display'] == cat]
+        ax.plot(cat_data['Date'], cat_data['Installs'], label=cat, marker='o')
+        
+        # Shade areas where growth >20%
+        growth_periods = cat_data[cat_data['Significant_Growth']]
+        if not growth_periods.empty:
+            for _, row in growth_periods.iterrows():
+                ax.fill_between([row['Date'], row['Date']], 0, row['Installs'], alpha=0.3, color='yellow')
+    
+    ax.set_xlabel('Date')
+    ax.set_ylabel('Total Installs')
+    ax.set_title('Trend of Total Installs Over Time by Category (with Significant Growth Highlighted)')
+    ax.legend()
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+else:
+    print("The graph is only available between 6PM IST and 9PM IST. Current time:", now.strftime('%H:%M %Z'))
