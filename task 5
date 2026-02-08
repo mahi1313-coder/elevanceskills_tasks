@@ -1,0 +1,67 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+from datetime import datetime
+import pytz
+
+data = {
+    'App_Name': ['GameApp1', 'BeautyApp1', 'BusinessApp1', 'ComicsApp1', 'CommunicationApp1', 'DatingApp1', 'EntertainmentApp1', 'SocialApp1', 'EventApp1', 'GameApp2', 'BeautyApp2'],
+    'Category': ['Game', 'Beauty', 'Business', 'Comics', 'Communication', 'Dating', 'Entertainment', 'Social', 'Event', 'Game', 'Beauty'],
+    'Size_MB': [20, 15, 25, 18, 22, 16, 19, 21, 17, 23, 14],  # Some below/above for filter
+    'Avg_Rating': [4.0, 4.2, 3.8, 4.1, 3.9, 4.3, 4.0, 3.7, 4.2, 4.5, 3.6],  # Some <=3.5 to filter
+    'Installs': [100000, 60000, 80000, 70000, 90000, 55000, 75000, 65000, 85000, 120000, 45000],  # Some <=50k to filter
+    'Reviews': [600, 700, 550, 800, 650, 750, 600, 550, 700, 900, 400],  # Some <=500 to filter
+    'Sentiment_Subjectivity': [0.6, 0.7, 0.5, 0.8, 0.6, 0.9, 0.7, 0.5, 0.8, 0.6, 0.4]  # Some <=0.5 to filter
+}
+
+df = pd.DataFrame(data)
+
+
+df_filtered = df[
+    (df['Avg_Rating'] > 3.5) &
+    (df['Category'].isin(['Game', 'Beauty', 'Business', 'Comics', 'Communication', 'Dating', 'Entertainment', 'Social', 'Event'])) &
+    (df['Reviews'] > 500) &
+    (~df['App_Name'].str.contains('S')) &
+    (df['Sentiment_Subjectivity'] > 0.5) &
+    (df['Installs'] > 50000)
+]
+
+translation_dict = {
+    'Beauty': 'सौंदर्य',  
+    'Business': 'வணிகம்', 
+    'Dating': 'Verabredung' 
+}
+df_filtered['Category_Display'] = df_filtered['Category'].map(lambda x: translation_dict.get(x, x))
+
+list = pytz.timezone('Asia/Kolkata')
+now = datetime.now(ist)
+current_hour = now.hour
+
+if 17 <= current_hour < 19:  
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+
+    colors = df_filtered['Category'].apply(lambda x: 'pink' if x == 'Game' else 'blue')
+    
+    
+    scatter = ax.scatter(df_filtered['Size_MB'], df_filtered['Avg_Rating'], 
+                         s=df_filtered['Installs']/1000,  # Scale bubble size
+                         c=colors, alpha=0.6, edgecolors='w', linewidth=0.5)
+    
+ 
+    for i, row in df_filtered.iterrows():
+        ax.annotate(row['Category_Display'], (row['Size_MB'], row['Avg_Rating']), 
+                    textcoords="offset points", xytext=(0,10), ha='center', fontsize=8)
+    
+    ax.set_xlabel('App Size (MB)')
+    ax.set_ylabel('Average Rating')
+    ax.set_title('Bubble Chart: App Size vs. Average Rating (Bubble Size = Installs)')
+    
+    
+    handles = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='pink', markersize=10, label='Game'),
+               plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='blue', markersize=10, label='Other Categories')]
+    ax.legend(handles=handles)
+    
+    plt.tight_layout()
+    plt.show()
+else:
+    print("The graph is only available between 5PM IST and 7PM IST. Current time:", now.strftime('%H:%M %Z'))
