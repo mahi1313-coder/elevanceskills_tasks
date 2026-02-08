@@ -1,0 +1,80 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+from datetime import datetime
+import pytz
+
+
+dates = pd.date_range(start='2023-01-01', periods=12, freq='M')
+categories = ['Travel & Local', 'Productivity', 'Photography', 'Tools']  # Filtered to start with T or P
+data = []
+for cat in categories:
+    for date in dates:
+        installs = 50000 + (hash(cat + str(date)) % 100000)  # Simulated installs
+        data.append({
+            'Date': date, 
+            'Category': cat, 
+            'Installs': installs, 
+            'Avg_Rating': 4.3,  
+            'App_Name': 'SampleApp',
+            'Reviews': 1500,  
+            'Size_MB': 30  
+        })
+
+df = pd.DataFrame(data)
+
+df_filtered = df[
+    (df['Avg_Rating'] >= 4.2) &
+    (~df['App_Name'].str.contains(r'\d')) &  # No numbers in app name
+    (df['Category'].str.startswith(('T', 'P'))) &
+    (df['Reviews'] > 1000) &
+    (df['Size_MB'].between(20, 80))
+]
+
+
+translation_dict = {
+    'Travel & Local': 'Voyage et Local', 
+    'Productivity': 'Productividad', 
+    'Photography': '写真', 
+}
+df_filtered['Category_Display'] = df_filtered['Category'].map(lambda x: translation_dict.get(x, x))
+
+
+df_agg = df_filtered.groupby(['Date', 'Category_Display'])['Installs'].sum().reset_index()
+
+
+pivot_df = df_agg.pivot(index='Date', columns='Category_Display', values='Installs').fillna(0)
+
+cumulative_df = pivot_df.cumsum()
+
+
+total_installs = cumulative_df.sum(axis=1)
+total_installs_prev = total_installs.shift(1)
+growth = (total_installs - total_installs_prev) / total_installs_prev * 100
+highlight_months = growth > 25
+
+
+ist = pytz.timezone('Asia/Kolkata')
+now = datetime.now(ist)
+current_hour = now.hour
+
+if 16 <= current_hour < 18:  
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+   
+    cumulative_df.plot.area(ax=ax, stacked=True, alpha=0.7)
+    
+   
+    for i, (date, is_highlight) in enumerate(highlight_months.items()):
+        if is_highlight:
+           
+            ax.fill_between([date, date], 0, cumulative_df.loc[date].sum(), alpha=1.0, color='gray')
+    
+    ax.set_xlabel('Date')
+    ax.set_ylabel('Cumulative Installs')
+    ax.set_title('Cumulative Installs Over Time by Category (Stacked Area)')
+    ax.legend(title='Category')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+else:
+    print("The graph is only available between 4PM IST and 6PM IST. Current time:", now.strftime('%H:%M %Z'))
